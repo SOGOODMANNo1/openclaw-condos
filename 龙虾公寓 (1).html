@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🦞 OpenClaw Apartments</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; image-rendering: pixelated; }
+
+  body {
+    background: #0a0a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Press Start 2P', monospace;
+    overflow-x: hidden;
+  }
+
+  /* Starfield */
+  #starfield {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+  }
+
+  .title-area {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 20px 10px 10px;
+  }
+
+  .main-title {
+    color: #ff4444;
+    font-size: clamp(14px, 3vw, 22px);
+    text-shadow: 3px 3px 0 #8b0000, 0 0 20px #ff4444;
+    letter-spacing: 2px;
+    animation: titlePulse 2s infinite;
+  }
+
+  @keyframes titlePulse {
+    0%,100% { text-shadow: 3px 3px 0 #8b0000, 0 0 20px #ff4444; }
+    50% { text-shadow: 3px 3px 0 #8b0000, 0 0 40px #ff8844, 0 0 60px #ff4444; }
+  }
+
+  .subtitle {
+    color: #ffaa44;
+    font-size: clamp(6px, 1.2vw, 9px);
+    margin-top: 8px;
+    animation: blink 1.5s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* Main building wrapper */
+  .building-wrapper {
+    position: relative; z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    margin-top: 5px;
+  }
+
+  /* Left side label */
+  .floor-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 4px;
+  }
+
+  .floor-label {
+    height: 130px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-size: 7px;
+    color: #888;
+    width: 18px;
+  }
+
+  /* Building */
+  .building {
+    position: relative;
+    border: 3px solid #555;
+    background: #1a1a2e;
+    box-shadow: 0 0 30px rgba(255,68,68,0.3), inset 0 0 30px rgba(0,0,0,0.5);
+  }
+
+  .floor {
+    position: relative;
+    width: 700px;
+    height: 130px;
+    border-bottom: 3px solid #444;
+    display: flex;
+    overflow: hidden;
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+  .floor:hover { filter: brightness(1.3); }
+  .floor:last-child { border-bottom: none; }
+
+  canvas.floor-canvas {
+    display: block;
+    width: 700px;
+    height: 130px;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: #000;
+    border: 2px solid #ff4444;
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 10px 12px;
+    max-width: 280px;
+    z-index: 1000;
+    pointer-events: none;
+    line-height: 1.8;
+    display: none;
+    box-shadow: 4px 4px 0 #ff4444;
+  }
+  .tooltip.visible { display: block; }
+  .tooltip .tip-title { color: #ffaa44; font-size: 9px; margin-bottom: 6px; }
+
+  /* CA Section */
+  .ca-section {
+    position: relative; z-index: 10;
+    width: 706px;
+    background: linear-gradient(135deg, #0d1117 0%, #1a0a2e 100%);
+    border: 3px solid #ff4444;
+    border-top: none;
+    padding: 16px 20px;
+    box-shadow: 0 4px 30px rgba(255,68,68,0.4);
+  }
+
+  .ca-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .ca-icon { font-size: 20px; animation: spin 3s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  .ca-title {
+    font-size: 9px;
+    color: #ff4444;
+    text-shadow: 0 0 10px #ff4444;
+  }
+
+  .ca-badge {
+    margin-left: auto;
+    font-size: 6px;
+    color: #00ff88;
+    border: 1px solid #00ff88;
+    padding: 3px 6px;
+    animation: badgePulse 2s infinite;
+  }
+  @keyframes badgePulse {
+    0%,100%{box-shadow:0 0 4px #00ff88} 50%{box-shadow:0 0 12px #00ff88, 0 0 20px #00ff88}
+  }
+
+  .ca-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .ca-input {
+    flex: 1;
+    background: #0a0a1a;
+    border: 2px solid #444;
+    color: #00ff88;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    letter-spacing: 1px;
+  }
+  .ca-input::placeholder { color: #333; }
+  .ca-input:focus {
+    border-color: #ff4444;
+    box-shadow: 0 0 10px rgba(255,68,68,0.5);
+  }
+
+  .ca-address {
+    flex: 1;
+    background: #0a0a1a;
+    border: 2px solid #333;
+    color: #00ff88;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 10px 12px;
+    letter-spacing: 1px;
+    word-break: break-all;
+    line-height: 1.8;
+    cursor: default;
+    user-select: all;
+  }
+
+  .ca-copy {
+    background: #ff4444;
+    border: 2px solid #ff8888;
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ca-copy:hover { background: #ff6666; transform: translate(-1px,-1px); box-shadow: 2px 2px 0 #8b0000; }
+  .ca-copy:active { transform: translate(1px,1px); box-shadow: none; }
+  .ca-copy.copied { background: #00aa55; border-color: #00ff88; }
+
+  .update-ticker {
+    margin-top: 10px;
+    font-size: 6px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .ticker-dot {
+    width: 6px; height: 6px;
+    background: #00ff88;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: dotBlink 1s step-end infinite;
+  }
+  @keyframes dotBlink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .ticker-text {
+    white-space: nowrap;
+    animation: tickerScroll 20s linear infinite;
+  }
+  @keyframes tickerScroll {
+    from { transform: translateX(100%); }
+    to { transform: translateX(-500%); }
+  }
+
+  /* Top nav */
+  .top-nav {
+    position: fixed;
+    top: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: rgba(10,10,26,0.85);
+    border: 2px solid #333;
+    color: #888;
+    text-decoration: none;
+    transition: all 0.15s;
+    backdrop-filter: blur(4px);
+  }
+  .nav-link:hover {
+    border-color: #ff4444;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(255,68,68,0.5);
+    transform: translate(-1px,-1px);
+  }
+  .nav-link svg {
+    width: 16px; height: 16px;
+    fill: currentColor;
+  }
+
+  /* Bottom footer */
+  .footer {
+    position: relative; z-index: 10;
+    font-size: 7px;
+    color: #333;
+    padding: 16px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<nav class="top-nav">
+  <a class="nav-link" href="https://x.com/YOUR_X_HANDLE" target="_blank" title="X / Twitter">
+    <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/></svg>
+  </a>
+  <a class="nav-link" href="https://github.com/YOUR_GITHUB" target="_blank" title="GitHub">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+  </a>
+</nav>
+
+<!-- Starfield -->
+<canvas id="starfield"></canvas>
+
+<div class="title-area">
+  <div class="main-title">🦞 OPENCLAW CONDOS 🦞</div>
+  <div class="subtitle">▶ PIXEL LOBSTER LIFE SIMULATOR ◀ 持续更新中</div>
+</div>
+
+<div class="building-wrapper">
+  <div class="floor-labels" id="floorLabels"></div>
+  <div>
+    <div class="building" id="building"></div>
+    <!-- CA Section attached to bottom of building -->
+    <div class="ca-section">
+      <div class="ca-header">
+        <span class="ca-icon">🔑</span>
+        <span class="ca-title">CONTRACT ADDRESS</span>
+        <span class="ca-badge">● LIVE</span>
+      </div>
+      <div class="ca-input-row">
+        <div class="ca-address" id="caAddress">TBA — 合约地址待公布</div>
+        <button class="ca-copy" id="caCopy" onclick="copyCA()">COPY ▶</button>
+      </div>
+      <div class="update-ticker">
+        <div class="ticker-dot"></div>
+        <div class="ticker-text">持续更新中 · CONTINUOUSLY UPDATING · 🦞 · NEW FLOORS COMING SOON · LOBSTER NEVER SLEEP · 持续更新中 · CONTINUOUSLY UPDATING · 🦞</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">© OPENCLAW CORP · ALL LOBSTERS RESERVED · 🦞 × ∞</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tip-title" id="tipTitle"></div>
+  <div id="tipContent"></div>
+</div>
+
+<script>
+// ============================================================
+// STARFIELD
+// ============================================================
+(function(){
+  const c = document.getElementById('starfield');
+  const ctx = c.getContext('2d');
+  function resize(){ c.width=window.innerWidth; c.height=window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+  const stars = Array.from({length:200}, ()=>({
+    x: Math.random()*window.innerWidth,
+    y: Math.random()*window.innerHeight,
+    s: Math.random()*2+0.5,
+    sp: Math.random()*0.3+0.1,
+    b: Math.random()
+  }));
+  function drawStars(){
+    ctx.clearRect(0,0,c.width,c.height);
+    stars.forEach(s=>{
+      s.b += 0.02;
+      const a = (Math.sin(s.b)+1)/2;
+      ctx.fillStyle = `rgba(255,255,255,${a*0.8})`;
+      ctx.fillRect(s.x,s.y,s.s,s.s);
+    });
+    requestAnimationFrame(drawStars);
+  }
+  drawStars();
+})();
+
+// ============================================================
+// PIXEL ART HELPERS
+// ============================================================
+const SCALE = 2; // each "pixel" = 2x2 real pixels
+
+function px(ctx, x, y, color, size=1){
+  ctx.fillStyle = color;
+  ctx.fillRect(x*SCALE, y*SCALE, SCALE*size, SCALE*size);
+}
+
+// Draw a pixel lobster at position (cx, cy) facing direction, with anim offset
+function drawLobster(ctx, cx, cy, colors, anim=0, variant=0){
+  // colors: {body, claw, leg, eye, accent}
+  const b = colors.body || '#cc2200';
+  const cl = colors.claw || '#ff3300';
+  const lg = colors.leg || '#aa1100';
+  const ey = colors.eye || '#ffffff';
+  const ac = colors.accent || '#ff6644';
+
+  const dy = anim; // vertical bob
+
+  // Body (5x5 pixel art lobster)
+  // Head
+  px(ctx, cx+1, cy+dy, b);
+  px(ctx, cx+2, cy+dy, b);
+  px(ctx, cx+3, cy+dy, b);
+  // Antennae
+  px(ctx, cx, cy-1+dy, ac);
+  px(ctx, cx+4, cy-1+dy, ac);
+  // Eyes
+  px(ctx, cx+1, cy+dy, ey);
+  px(ctx, cx+3, cy+dy, ey);
+  // Torso
+  px(ctx, cx+1, cy+1+dy, b);
+  px(ctx, cx+2, cy+1+dy, b);
+  px(ctx, cx+3, cy+1+dy, b);
+  // Shell segments
+  px(ctx, cx+1, cy+2+dy, ac);
+  px(ctx, cx+2, cy+2+dy, b);
+  px(ctx, cx+3, cy+2+dy, ac);
+  // Abdomen
+  px(ctx, cx+1, cy+3+dy, b);
+  px(ctx, cx+2, cy+3+dy, b);
+  px(ctx, cx+3, cy+3+dy, b);
+  // Tail
+  px(ctx, cx, cy+4+dy, cl);
+  px(ctx, cx+1, cy+4+dy, lg);
+  px(ctx, cx+2, cy+4+dy, cl);
+  px(ctx, cx+3, cy+4+dy, lg);
+  px(ctx, cx+4, cy+4+dy, cl);
+  // Claws
+  if(variant===0){
+    px(ctx, cx-1, cy+1+dy, cl);
+    px(ctx, cx-1, cy+2+dy, cl);
+    px(ctx, cx+5, cy+1+dy, cl);
+    px(ctx, cx+5, cy+2+dy, cl);
+  } else if(variant===1){ // raised claw
+    px(ctx, cx-1, cy+dy, cl);
+    px(ctx, cx-2, cy-1+dy, cl);
+    px(ctx, cx+5, cy+1+dy, cl);
+    px(ctx, cx+5, cy+2+dy, cl);
+  } else if(variant===2){ // both raised
+    px(ctx, cx-1, cy+dy, cl);
+    px(ctx, cx-2, cy-1+dy, cl);
+    px(ctx, cx+5, cy+dy, cl);
+    px(ctx, cx+6, cy-1+dy, cl);
+  }
+  // Legs
+  px(ctx, cx, cy+2+dy, lg);
+  px(ctx, cx+4, cy+2+dy, lg);
+  px(ctx, cx, cy+3+dy, lg);
+  px(ctx, cx+4, cy+3+dy, lg);
+}
+
+// Draw text pixel style (8px font using ctx)
+function drawText(ctx, text, x, y, color, size=10){
+  ctx.fillStyle = color;
+  ctx.font = `${size}px 'Press Start 2P', monospace`;
+  ctx.fillText(text, x*SCALE, y*SCALE);
+}
+
+// Draw rect
+function rect(ctx, x, y, w, h, color){
+  ctx.fillStyle = color;
+  ctx.fillRect(x*SCALE, y*SCALE, w*SCALE, h*SCALE);
+}
+
+// ============================================================
+// FLOOR DEFINITIONS
+// ============================================================
+const FLOOR_W = 350; // logical pixels
+const FLOOR_H = 65;  // logical pixels
+
+const floors = [
+  {
+    id: 'f6', label: '6F', name: '🎉 屋顶派对 ROOFTOP',
+    bg: '#0a1a3a', accent: '#4488ff',
+    tip: '屋顶派对', tipContent: '🎧 DJ打碟 · 旋转黑胶 · 音频柱闪烁\n🥂 派对碰杯 · 气泡四溅\n🌙 望月发呆 · 思考泡泡漂浮\n🏊 屋顶泳池 · 波光粼粼',
+    draw: drawRooftop
+  },
+  {
+    id: 'f5', label: '5F', name: '💼 龙虾公司 LOBSTER INC',
+    bg: '#0f1a0f', accent: '#44ff44',
+    tip: '龙虾公司', tipContent: '📊 CEO看白板流程图 · 战略部署\n💻 程序员盯滚动代码 · 熬夜debug\n🎨 设计师画原型 · 创意爆发\n🤝 HR面试 · 严肃考核',
+    draw: drawOffice
+  },
+  {
+    id: 'f4', label: '4F', name: '💪 健身房 GYM',
+    bg: '#1a0a0a', accent: '#ff4444',
+    tip: '龙虾健身房', tipContent: '🏋️ 举哑铃 · 龙虾上下抖动\n🏃 跑步机 · 传送带滚动\n🧘 瑜伽室 · 极限拉伸\n🥊 拳击沙袋 · 猛力挥钳',
+    draw: drawGym
+  },
+  {
+    id: 'f3', label: '3F', name: '👨‍👩‍👧 家庭楼层 FAMILY',
+    bg: '#1a1000', accent: '#ffaa00',
+    tip: '家庭楼层', tipContent: '⚽ 看球赛 · TV闪烁绿茵场\n🍳 厨房火焰 · 热气蒸腾\n📚 小孩写作业 · 苦苦思索\n🧶 奶奶织毛衣 · 岁月静好',
+    draw: drawFamily
+  },
+  {
+    id: 'f2', label: '2F', name: '🎮 单身公寓 SINGLE',
+    bg: '#0a0020', accent: '#aa44ff',
+    tip: '单身公寓', tipContent: '🎮 打游戏 · 屏幕子弹横飞\n📱 深夜刷手机 · 蓝光照脸\n🎸 弹吉他 · 音符飘飞\n💤 睡觉打Z · 梦中遨游',
+    draw: drawSingle
+  },
+  {
+    id: 'f1', label: '1F', name: '🍽️ 食堂 CANTEEN',
+    bg: '#1a0a00', accent: '#ff8800',
+    tip: '龙虾食堂', tipContent: '👨‍🍳 大厨炒菜 · 戴高帽\n🪑 顾客等位 · 刷手机\n💰 收银老板娘 · 精打细算\n🛵 外卖小哥 · 风驰电掣',
+    draw: drawCanteen
+  }
+];
+
+// ============================================================
+// FLOOR DRAW FUNCTIONS
+// ============================================================
+
+// --- 6F ROOFTOP ---
+function drawRooftop(ctx, t){
+  // Sky gradient
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#050e2a');
+  // Stars
+  [[10,5],[25,3],[40,8],[60,2],[80,6],[100,4],[120,9],[150,3],[180,7],[200,5],[220,2],[240,8],[260,4],[280,6],[300,3],[320,7],[340,5]].forEach(([x,y])=>{
+    const a = (Math.sin(t*0.05+x)*0.5+0.5);
+    ctx.globalAlpha = a;
+    rect(ctx, x, y, 1, 1, '#ffffff');
+    ctx.globalAlpha = 1;
+  });
+
+  // Moon
+  const moonX = 310, moonY = 5;
+  rect(ctx, moonX, moonY, 8, 8, '#ffffaa');
+  rect(ctx, moonX+1, moonY+1, 6, 6, '#ffff88');
+  rect(ctx, moonX+2, moonY+2, 4, 4, '#ffffff');
+
+  // Floor surface
+  rect(ctx, 0, 48, FLOOR_W, 3, '#334455');
+  rect(ctx, 0, 51, FLOOR_W, FLOOR_H-51, '#223344');
+
+  // Pool (right side)
+  rect(ctx, 250, 40, 70, 12, '#1155aa');
+  const waveOff = Math.sin(t*0.08)*2;
+  for(let i=0;i<7;i++){
+    const wx = 252 + i*9 + waveOff;
+    rect(ctx, wx, 42, 5, 1, '#3388ff');
+    rect(ctx, wx+2, 44, 4, 1, '#2266cc');
+  }
+  rect(ctx, 250, 40, 70, 2, '#334466'); // pool edge
+  rect(ctx, 248, 38, 74, 3, '#445566'); // pool wall
+
+  // DJ Setup (left area)
+  // Table
+  rect(ctx, 15, 38, 50, 5, '#445566');
+  rect(ctx, 15, 43, 50, 3, '#556677');
+  // Vinyl record (spinning)
+  const recX = 22, recY = 32;
+  const angle = t * 0.15;
+  ctx.save();
+  ctx.translate(recX*SCALE+5*SCALE, recY*SCALE+5*SCALE);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(0,0,5*SCALE,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#333';
+  ctx.beginPath(); ctx.arc(0,0,3*SCALE,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#ff4444';
+  ctx.beginPath(); ctx.arc(0,0,1*SCALE,0,Math.PI*2); ctx.fill();
+  // grooves
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = SCALE*0.5;
+  for(let r=2;r<=4;r++){
+    ctx.beginPath(); ctx.arc(0,0,r*SCALE,0,Math.PI*2); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Second vinyl
+  const rec2X = 38, rec2Y = 32;
+  ctx.save();
+  ctx.translate(rec2X*SCALE+5*SCALE, rec2Y*SCALE+5*SCALE);
+  ctx.rotate(-angle*0.7);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath(); ctx.arc(0,0,5*SCALE,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath(); ctx.arc(0,0,3*SCALE,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#4444ff';
+  ctx.beginPath(); ctx.arc(0,0,1*SCALE,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Audio bars
+  const barColors = ['#ff4444','#ff8800','#ffff00','#00ff88','#4488ff','#aa44ff'];
+  for(let i=0;i<6;i++){
+    const h = 5 + Math.floor(Math.abs(Math.sin(t*0.1+i*0.9))*12);
+    rect(ctx, 68+i*5, 48-h, 4, h, barColors[i]);
+  }
+
+  // DJ lobster
+  const djAnim = Math.floor(t/8)%2;
+  drawLobster(ctx, 14, 38-10+djAnim, {body:'#cc2200',claw:'#ff4400',leg:'#aa1100',eye:'#ffff00',accent:'#ff6644'}, 0, djAnim===0?1:0);
+
+  // Party lobsters (right area)
+  // Lobster with raised glass
+  const partyAnim = Math.floor(t/6)%2;
+  drawLobster(ctx, 110, 38, {body:'#dd3300',claw:'#ff5500',leg:'#bb2200',eye:'#ffff00',accent:'#ff7755'}, partyAnim, 1);
+  // Glass
+  rect(ctx, 116, 30+partyAnim, 3, 5, '#88ccff');
+  rect(ctx, 115, 35+partyAnim, 5, 1, '#aaddff');
+  // Bubbles from glass
+  if(t%20<10){
+    ctx.globalAlpha = 0.7;
+    rect(ctx, 117, 28+partyAnim, 1, 1, '#cceeff');
+    rect(ctx, 119, 26+partyAnim, 1, 1, '#cceeff');
+    ctx.globalAlpha = 1;
+  }
+
+  // Second party lobster
+  drawLobster(ctx, 130, 38, {body:'#aa3300',claw:'#cc5500',leg:'#882200',eye:'#ffff00',accent:'#dd6644'}, -partyAnim, 0);
+
+  // Moon gazing lobster
+  const gazeAnim = Math.floor(t/12)%3;
+  drawLobster(ctx, 195, 38, {body:'#8822aa',claw:'#aa44cc',leg:'#661188',eye:'#ffff00',accent:'#cc66dd'}, 0, 0);
+  // Thought bubbles
+  if(gazeAnim < 2){
+    const bubAlpha = [0.5,0.8,1][gazeAnim] || 1;
+    ctx.globalAlpha = bubAlpha;
+    [[202,35,2],[205,32,2],[208,28,3],[212,24,4]].forEach(([bx,by,br])=>{
+      ctx.fillStyle = '#8888aa';
+      ctx.beginPath(); ctx.arc(bx*SCALE,by*SCALE,br*SCALE,0,Math.PI*2); ctx.fill();
+    });
+    // Thought content: tiny heart/star
+    rect(ctx, 209, 20, 3, 2, '#ff8888');
+    rect(ctx, 210, 19, 1, 1, '#ff8888');
+    ctx.globalAlpha = 1;
+  }
+}
+
+// --- 5F OFFICE ---
+function drawOffice(ctx, t){
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#0f1a12');
+  // Ceiling tiles
+  for(let i=0;i<8;i++){
+    rect(ctx, i*44+2, 0, 40, 2, '#1a2a1a');
+  }
+  // Floor
+  rect(ctx, 0, 58, FLOOR_W, FLOOR_H-58, '#1a2a1a');
+
+  // Room dividers
+  rect(ctx, 87, 0, 2, FLOOR_H, '#254025');
+  rect(ctx, 174, 0, 2, FLOOR_H, '#254025');
+  rect(ctx, 261, 0, 2, FLOOR_H, '#254025');
+
+  // === Room 1: CEO + Whiteboard ===
+  // Whiteboard
+  rect(ctx, 10, 8, 40, 28, '#e8f0e8');
+  rect(ctx, 10, 8, 40, 2, '#556655');
+  // Flowchart on whiteboard
+  rect(ctx, 18, 12, 10, 5, '#aaffaa');
+  rect(ctx, 20, 17, 1, 3, '#557755');
+  rect(ctx, 18, 20, 10, 5, '#aaaaff');
+  rect(ctx, 25, 17, 1, 3, '#557755');
+  rect(ctx, 20, 17, 6, 1, '#557755');
+  // Arrow from box2
+  rect(ctx, 18, 25, 10, 1, '#557755');
+  rect(ctx, 22, 26, 1, 3, '#557755');
+  rect(ctx, 18, 29, 10, 5, '#ffaaaa');
+  // Text-like lines on whiteboard
+  for(let i=0;i<4;i++){
+    rect(ctx, 33, 12+i*3, 12, 1, '#557755');
+  }
+  // CEO lobster
+  const ceoAnim = Math.floor(t/15)%2;
+  drawLobster(ctx, 55, 38, {body:'#cc2200',claw:'#ff4400',leg:'#aa1100',eye:'#ffffff',accent:'#ff6644'}, ceoAnim, 1);
+  // Pointer stick
+  rect(ctx, 50, 25+ceoAnim, 2, 14, '#885533');
+
+  // === Room 2: Programmer ===
+  // Monitor
+  rect(ctx, 100, 20, 42, 28, '#001100');
+  rect(ctx, 100, 20, 42, 2, '#333');
+  rect(ctx, 121, 48, 4, 4, '#556655');
+  rect(ctx, 117, 52, 12, 2, '#556655');
+  // Scrolling code
+  const codeOffset = Math.floor(t/2) % 40;
+  const codeColors = ['#44ff44','#ffff44','#44ffff','#ff8844'];
+  for(let row=0;row<10;row++){
+    const y2 = 22 + row*2;
+    if(y2 >= 48) break;
+    const lineLen = 5 + ((row*7+codeOffset)%25);
+    const col = codeColors[(row+Math.floor(t/20))%4];
+    rect(ctx, 102, y2, lineLen, 1, col);
+    if(lineLen>15) rect(ctx, 102+lineLen+2, y2, (row*3+5)%15, 1, codeColors[(row+2)%4]);
+  }
+  // Cursor blink
+  if(t%20<10) rect(ctx, 102+((t*2)%30), 44, 1, 1, '#00ff00');
+  // Programmer lobster (tired)
+  const progAnim = Math.floor(t/30)%2;
+  drawLobster(ctx, 146, 38, {body:'#884400',claw:'#aa6600',leg:'#663300',eye:'#ffff00',accent:'#cc8833'}, progAnim, 0);
+
+  // === Room 3: Designer ===
+  // Canvas/tablet
+  rect(ctx, 185, 15, 48, 35, '#f5f0e8');
+  rect(ctx, 185, 15, 48, 2, '#aa8855');
+  // Design prototype
+  rect(ctx, 190, 20, 18, 12, '#ffaacc');
+  rect(ctx, 210, 20, 10, 5, '#aaccff');
+  rect(ctx, 210, 27, 10, 5, '#aaffaa');
+  rect(ctx, 190, 34, 38, 2, '#ddd');
+  // Color palette
+  [[190,38,'#ff4444'],[194,38,'#ff8800'],[198,38,'#ffff00'],[202,38,'#44ff44'],[206,38,'#4488ff'],[210,38,'#aa44ff']].forEach(([x,y,c])=>{
+    rect(ctx, x, y, 3, 3, c);
+  });
+  // Designer lobster
+  const desAnim = Math.floor(t/10)%2;
+  drawLobster(ctx, 238, 38, {body:'#ff44aa',claw:'#ff66cc',leg:'#dd2288',eye:'#ffffff',accent:'#ff99cc'}, desAnim, 1);
+
+  // === Room 4: HR Interview ===
+  // Table
+  rect(ctx, 275, 38, 55, 4, '#556644');
+  // HR lobster
+  drawLobster(ctx, 275, 27, {body:'#224422',claw:'#336633',leg:'#113311',eye:'#ffff00',accent:'#448844'}, 0, 0);
+  // Interviewee lobster (nervous bob)
+  const intAnim = Math.floor(t/8)%3===0 ? 1 : 0;
+  drawLobster(ctx, 315, 27, {body:'#664422',claw:'#886633',leg:'#553311',eye:'#ffff00',accent:'#998844'}, intAnim, 0);
+  // Papers on table
+  rect(ctx, 283, 33, 10, 6, '#eeeecc');
+  rect(ctx, 284, 34, 8, 1, '#888866');
+  rect(ctx, 284, 36, 8, 1, '#888866');
+  rect(ctx, 284, 38, 5, 1, '#888866');
+  // Lamp
+  rect(ctx, 330, 15, 2, 20, '#888');
+  rect(ctx, 325, 13, 12, 4, '#ffff88');
+  ctx.globalAlpha = 0.2;
+  rect(ctx, 322, 17, 18, 20, '#ffff88');
+  ctx.globalAlpha = 1;
+}
+
+// --- 4F GYM ---
+function drawGym(ctx, t){
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#1a0505');
+  // Floor mats
+  for(let i=0;i<FLOOR_W;i+=22){
+    rect(ctx, i, 52, 20, FLOOR_H-52, '#2a0a0a');
+  }
+  // Ceiling bars
+  for(let i=0;i<FLOOR_W;i+=50){
+    rect(ctx, i, 0, 45, 2, '#333');
+    rect(ctx, i+22, 0, 2, 10, '#444');
+  }
+
+  // === Dumbbell Zone ===
+  // Bench
+  rect(ctx, 10, 44, 50, 5, '#554444');
+  rect(ctx, 15, 49, 40, 2, '#443333');
+  // Lifting lobster
+  const liftAnim = Math.floor(t/8)%4;
+  const liftY = [0,-2,-4,-2][liftAnim];
+  drawLobster(ctx, 20, 36+liftY, {body:'#cc2200',claw:'#ff4400',leg:'#aa1100',eye:'#ffffff',accent:'#ff6644'}, 0, 2);
+  // Barbell
+  rect(ctx, 14, 28+liftY, 30, 2, '#888');
+  // Weights
+  rect(ctx, 10, 24+liftY, 6, 10, '#555');
+  rect(ctx, 12, 22+liftY, 2, 14, '#666');
+  rect(ctx, 42, 24+liftY, 6, 10, '#555');
+  rect(ctx, 44, 22+liftY, 2, 14, '#666');
+  // Sweat drops
+  if(liftAnim===2){
+    rect(ctx, 28, 28, 1, 2, '#4488ff');
+    rect(ctx, 32, 26, 1, 2, '#4488ff');
+  }
+
+  // === Treadmill ===
+  // Machine frame
+  rect(ctx, 90, 30, 60, 25, '#443333');
+  rect(ctx, 90, 30, 60, 3, '#665555');
+  rect(ctx, 90, 53, 60, 2, '#332222');
+  // Belt (animated)
+  const beltOff = Math.floor(t/2) % 12;
+  for(let i=0;i<6;i++){
+    const bx = 91 + ((i*12+beltOff)%60);
+    if(bx < 148) rect(ctx, bx, 52, 8, 2, '#554444');
+  }
+  // Treadmill lobster running
+  const runAnim = Math.floor(t/4)%4;
+  const runVariants = [0,1,0,2];
+  drawLobster(ctx, 105, 24, {body:'#dd3300',claw:'#ff5500',leg:'#bb2200',eye:'#ffffff',accent:'#ff7755'}, 0, runVariants[runAnim]);
+  // Display screen
+  rect(ctx, 130, 32, 15, 8, '#001100');
+  rect(ctx, 131, 33, 13, 6, '#002200');
+  drawText(ctx, '5.2', 66, 20, '#00ff00', 6);
+
+  // === Yoga Corner ===
+  rect(ctx, 175, 50, 50, 4, '#334433');
+  rect(ctx, 175, 54, 50, FLOOR_H-54, '#223322');
+  // Yoga mat
+  rect(ctx, 180, 52, 40, 3, '#44aa44');
+  // Yoga lobster (stretched)
+  drawLobster(ctx, 190, 42, {body:'#44aa88',claw:'#66ccaa',leg:'#228866',eye:'#ffffff',accent:'#88ddbb'}, 0, 2);
+  // Om symbol area
+  rect(ctx, 208, 35, 8, 8, '#334433');
+  drawText(ctx, 'OM', 106, 23, '#88eeaa', 7);
+
+  // === Boxing Bag ===
+  // Bag hanging
+  const bagSwing = Math.sin(t*0.1)*2;
+  rect(ctx, 293+bagSwing, 10, 15, 35, '#884422');
+  rect(ctx, 294+bagSwing, 11, 13, 3, '#aa6644');
+  rect(ctx, 294+bagSwing, 19, 13, 3, '#aa6644');
+  rect(ctx, 294+bagSwing, 27, 13, 3, '#aa6644');
+  rect(ctx, 295+bagSwing, 8, 11, 4, '#553311');
+  rect(ctx, 299, 0, 3, 10, '#666'); // chain
+  // Boxing lobster
+  const boxAnim = Math.floor(t/5)%3;
+  const boxX = 278 - (boxAnim===1?3:0);
+  drawLobster(ctx, boxX, 36, {body:'#cc4400',claw:'#ff6600',leg:'#aa2200',eye:'#ffffff',accent:'#ff8844'}, 0, boxAnim===0?1:2);
+  // Impact stars
+  if(boxAnim===1){
+    rect(ctx, 290, 30, 2, 2, '#ffff00');
+    rect(ctx, 288, 32, 1, 1, '#ffff00');
+    rect(ctx, 292, 33, 1, 1, '#ffff00');
+  }
+}
+
+// --- 3F FAMILY ---
+function drawFamily(ctx, t){
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#1a1005');
+  // Wallpaper pattern
+  for(let x=0;x<FLOOR_W;x+=12){
+    for(let y=0;y<FLOOR_H;y+=12){
+      ctx.globalAlpha = 0.07;
+      rect(ctx, x, y, 10, 10, '#ffaa44');
+      ctx.globalAlpha = 1;
+    }
+  }
+  // Floor
+  rect(ctx, 0, 56, FLOOR_W, FLOOR_H-56, '#2a1a0a');
+  rect(ctx, 0, 54, FLOOR_W, 2, '#3a2a1a');
+
+  // Room dividers
+  rect(ctx, 87, 0, 2, FLOOR_H, '#4a3020');
+  rect(ctx, 174, 0, 2, FLOOR_H, '#4a3020');
+  rect(ctx, 261, 0, 2, FLOOR_H, '#4a3020');
+
+  // === Living Room: TV + Sofa ===
+  // TV
+  rect(ctx, 5, 10, 55, 38, '#111');
+  rect(ctx, 6, 11, 53, 36, '#001100');
+  // Football field on TV (blinking)
+  const tvBright = 0.7 + Math.sin(t*0.15)*0.3;
+  ctx.globalAlpha = tvBright;
+  rect(ctx, 7, 12, 51, 34, '#005500');
+  // Field lines
+  rect(ctx, 32, 12, 1, 34, '#00aa00');
+  rect(ctx, 7, 29, 51, 1, '#00aa00');
+  // Center circle
+  ctx.strokeStyle = '#00aa00'; ctx.lineWidth = SCALE;
+  ctx.beginPath(); ctx.arc(32*SCALE, 29*SCALE, 6*SCALE, 0, Math.PI*2); ctx.stroke();
+  // Ball (moving)
+  const ballX = 15 + ((t*2)%38);
+  rect(ctx, ballX, 24, 3, 3, '#ffffff');
+  ctx.globalAlpha = 1;
+  // TV stand
+  rect(ctx, 28, 48, 10, 4, '#333');
+  rect(ctx, 20, 52, 26, 2, '#333');
+  // Sofa
+  rect(ctx, 5, 44, 65, 10, '#884422');
+  rect(ctx, 5, 42, 65, 4, '#aa6633');
+  rect(ctx, 5, 42, 4, 14, '#aa6633');
+  rect(ctx, 66, 42, 4, 14, '#aa6633');
+  // Watching lobsters
+  drawLobster(ctx, 10, 34, {body:'#cc2200',claw:'#ff4400',leg:'#aa1100',eye:'#ffffff',accent:'#ff6644'}, 0, 0);
+  drawLobster(ctx, 24, 34, {body:'#aa2288',claw:'#cc44aa',leg:'#881166',eye:'#ffffff',accent:'#dd66bb'}, 0, 0);
+  // Popcorn
+  rect(ctx, 35, 40, 8, 6, '#cc8833');
+  rect(ctx, 36, 38, 6, 3, '#ffcc44');
+
+  // === Kitchen ===
+  // Counter
+  rect(ctx, 96, 40, 60, 8, '#cc9955');
+  rect(ctx, 96, 38, 60, 2, '#ddaa66');
+  // Stove
+  rect(ctx, 100, 25, 30, 16, '#666');
+  rect(ctx, 102, 27, 26, 12, '#444');
+  // Burners + flame
+  [[108,30],[122,30]].forEach(([bx,by])=>{
+    rect(ctx, bx, by, 8, 3, '#222');
+    // Flame animation
+    const flameH = 3 + Math.floor(Math.sin(t*0.2+bx)*2);
+    const flameColors = ['#ff8800','#ff4400','#ffcc00'];
+    rect(ctx, bx+1, by-flameH, 6, flameH, flameColors[Math.floor(t/5)%3]);
+    rect(ctx, bx+2, by-flameH-1, 4, 2, '#ffff00');
+  });
+  // Pan with steam
+  rect(ctx, 107, 27, 20, 4, '#888');
+  rect(ctx, 109, 26, 16, 2, '#999');
+  // Steam
+  for(let i=0;i<3;i++){
+    const sy = 20 - (t*0.5+i*5)%15;
+    ctx.globalAlpha = 1 - (sy/20);
+    rect(ctx, 112+i*4, sy, 2, 3, '#cccccc');
+    ctx.globalAlpha = 1;
+  }
+  // Kitchen lobster (chef hat)
+  drawLobster(ctx, 135, 30, {body:'#cc5500',claw:'#ff7700',leg:'#aa3300',eye:'#ffffff',accent:'#ff9944'}, 0, 1);
+  // Chef hat
+  rect(ctx, 136, 24, 7, 2, '#ffffff');
+  rect(ctx, 137, 20, 5, 6, '#ffffff');
+  rect(ctx, 138, 19, 3, 2, '#ffffff');
+  // Shelves + pots
+  rect(ctx, 153, 20, 18, 2, '#aa7744');
+  rect(ctx, 155, 15, 6, 6, '#888');
+  rect(ctx, 163, 15, 5, 6, '#aa6622');
+
+  // === Kids Homework ===
+  // Desk
+  rect(ctx, 183, 42, 55, 4, '#aa8855');
+  rect(ctx, 185, 46, 3, 10, '#997744');
+  rect(ctx, 233, 46, 3, 10, '#997744');
+  // Book + paper
+  rect(ctx, 188, 36, 28, 8, '#eeeedd');
+  for(let i=0;i<4;i++) rect(ctx, 190, 37+i*2, 24, 1, '#9999aa');
+  rect(ctx, 205, 32, 18, 10, '#ddddcc');
+  // Pencil
+  rect(ctx, 215, 34, 1, 8, '#ffcc44');
+  rect(ctx, 215, 33, 1, 1, '#ff6644');
+  // Kid lobster (thinking)
+  drawLobster(ctx, 196, 32, {body:'#ff6644',claw:'#ff8866',leg:'#dd4422',eye:'#ffffff',accent:'#ffaa88'}, 0, 0);
+  // Question mark bubble
+  if(Math.floor(t/15)%2===0){
+    rect(ctx, 203, 24, 8, 8, '#334455');
+    drawText(ctx, '?', 103, 17, '#ffff44', 8);
+  }
+
+  // === Grandma Knitting ===
+  // Armchair
+  rect(ctx, 275, 38, 45, 14, '#8855aa');
+  rect(ctx, 275, 34, 45, 6, '#9966bb');
+  rect(ctx, 275, 34, 4, 18, '#9966bb');
+  rect(ctx, 316, 34, 4, 18, '#9966bb');
+  // Footrest
+  rect(ctx, 285, 52, 25, 5, '#7744aa');
+  // Grandma lobster
+  drawLobster(ctx, 285, 26, {body:'#884488',claw:'#aa66aa',leg:'#662266',eye:'#ffffff',accent:'#cc88cc'}, 0, 0);
+  // Knitting needles
+  rect(ctx, 284, 36, 1, 12, '#dddd88');
+  rect(ctx, 295, 34, 1, 14, '#dddd88');
+  // Wool ball
+  rect(ctx, 296, 46, 8, 8, '#ff8888');
+  for(let i=0;i<3;i++){
+    const wr = 3-i;
+    ctx.strokeStyle = '#ffaaaa'; ctx.lineWidth = SCALE*0.5;
+    ctx.beginPath(); ctx.arc((300+i)*SCALE,(50)*SCALE,wr*SCALE,0,Math.PI*2); ctx.stroke();
+  }
+  // Knitting lines from needles to lobster
+  const kAnim = Math.floor(t/10);
+  if(kAnim%2===0){
+    ctx.strokeStyle = '#ff8888'; ctx.lineWidth = SCALE*0.5;
+    ctx.beginPath();
+    ctx.moveTo(285*SCALE, 40*SCALE); ctx.lineTo(296*SCALE, 50*SCALE);
+    ctx.stroke();
+  }
+  // Cat (optional decoration)
+  rect(ctx, 318, 48, 10, 6, '#aa8844');
+  rect(ctx, 318, 46, 4, 3, '#bb9955');
+  rect(ctx, 324, 46, 4, 3, '#bb9955');
+  // cat tail
+  rect(ctx, 328, 48, 2, 2, '#aa8844');
+  rect(ctx, 329, 46, 1, 3, '#aa8844');
+}
+
+// --- 2F SINGLE ---
+function drawSingle(ctx, t){
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#050010');
+  // Dark ambiance
+  for(let x=0;x<FLOOR_W;x+=30){
+    ctx.globalAlpha = 0.05;
+    rect(ctx, x, 0, 25, FLOOR_H, '#220033');
+    ctx.globalAlpha = 1;
+  }
+  // Floor
+  rect(ctx, 0, 56, FLOOR_W, FLOOR_H-56, '#0a0020');
+
+  // Room dividers
+  rect(ctx, 87, 0, 2, FLOOR_H, '#1a1030');
+  rect(ctx, 174, 0, 2, FLOOR_H, '#1a1030');
+  rect(ctx, 261, 0, 2, FLOOR_H, '#1a1030');
+
+  // === Gaming Room ===
+  // Monitor
+  rect(ctx, 10, 15, 55, 35, '#111');
+  rect(ctx, 11, 16, 53, 33, '#000033');
+  // Game screen - shooter
+  rect(ctx, 12, 17, 51, 31, '#001122');
+  // Stars/space bg
+  [[15,20],[25,18],[38,22],[50,19],[55,25],[20,28],[42,30],[60,23]].forEach(([sx,sy])=>{
+    ctx.globalAlpha = 0.5;
+    rect(ctx, sx, sy, 1, 1, '#ffffff');
+    ctx.globalAlpha = 1;
+  });
+  // Enemy ships
+  [[20,20,'#ff4444'],[35,22,'#ff8800'],[50,19,'#ff4444']].forEach(([ex,ey,ec])=>{
+    rect(ctx, ex, ey, 5, 3, ec);
+    rect(ctx, ex+1, ey-1, 3, 1, ec);
+  });
+  // Player ship
+  const playerX = 25 + Math.floor(Math.sin(t*0.05)*15);
+  rect(ctx, playerX, 40, 6, 4, '#00aaff');
+  rect(ctx, playerX+2, 38, 2, 2, '#00ccff');
+  // Bullets
+  const bullOff = (t*3) % 25;
+  rect(ctx, playerX+2, 40-bullOff, 2, 3, '#ffff00');
+  // Monitor stand
+  rect(ctx, 34, 50, 8, 4, '#333');
+  rect(ctx, 26, 54, 24, 2, '#333');
+  // Gamer lobster
+  drawLobster(ctx, 55, 38, {body:'#4422aa',claw:'#6644cc',leg:'#2211aa',eye:'#00ffff',accent:'#8866dd'}, 0, 0);
+  // Controller
+  rect(ctx, 56, 44, 12, 6, '#333');
+  rect(ctx, 58, 46, 2, 2, '#ff4444');
+  rect(ctx, 62, 44, 2, 2, '#44ff44');
+  rect(ctx, 64, 46, 2, 2, '#4488ff');
+
+  // === Phone Zone (blue light) ===
+  // Bed / sofa
+  rect(ctx, 100, 42, 55, 12, '#220033');
+  rect(ctx, 100, 40, 55, 4, '#330044');
+  rect(ctx, 100, 40, 4, 16, '#330044');
+  // Pillow
+  rect(ctx, 148, 42, 10, 8, '#443355');
+  // Phone lobster lying down
+  drawLobster(ctx, 115, 36, {body:'#663399',claw:'#8855bb',leg:'#441177',eye:'#00aaff',accent:'#9977cc'}, 0, 0);
+  // Blue light from phone on face
+  ctx.globalAlpha = 0.4;
+  rect(ctx, 113, 34, 10, 6, '#0088ff');
+  ctx.globalAlpha = 1;
+  // Phone
+  rect(ctx, 128, 34, 8, 12, '#111');
+  rect(ctx, 129, 35, 6, 10, '#0033ff');
+  // Social media feed simulation
+  for(let r=0;r<4;r++){
+    rect(ctx, 130, 36+r*2, 4, 1, ['#4488ff','#ff4488','#44ff88','#ff8844'][r]);
+  }
+  // Clock on wall
+  rect(ctx, 148, 8, 16, 16, '#222');
+  ctx.strokeStyle = '#888'; ctx.lineWidth = SCALE*0.5;
+  ctx.beginPath(); ctx.arc(156*SCALE, 16*SCALE, 6*SCALE, 0, Math.PI*2); ctx.stroke();
+  const h = (t*0.02) % (Math.PI*2);
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = SCALE;
+  ctx.beginPath(); ctx.moveTo(156*SCALE,16*SCALE); ctx.lineTo((156+Math.cos(h)*4)*SCALE,(16+Math.sin(h)*4)*SCALE); ctx.stroke();
+  drawText(ctx, '3AM', 74, 9, '#ff4444', 7);
+
+  // === Guitar Room ===
+  // Guitar
+  rect(ctx, 195, 20, 8, 30, '#aa6622');
+  rect(ctx, 192, 28, 14, 16, '#cc8833');
+  rect(ctx, 193, 29, 12, 14, '#bb7722');
+  rect(ctx, 197, 33, 4, 4, '#000');
+  // Strings
+  for(let s=0;s<4;s++){
+    ctx.strokeStyle = '#cccc88'; ctx.lineWidth = SCALE*0.4;
+    ctx.beginPath(); ctx.moveTo((196+s)*SCALE, 20*SCALE); ctx.lineTo((196+s)*SCALE, 50*SCALE); ctx.stroke();
+  }
+  // Amp
+  rect(ctx, 220, 30, 25, 22, '#333');
+  rect(ctx, 222, 32, 10, 10, '#222');
+  ctx.strokeStyle = '#555'; ctx.lineWidth = SCALE;
+  ctx.beginPath(); ctx.arc(227*SCALE, 37*SCALE, 4*SCALE, 0, Math.PI*2); ctx.stroke();
+  // Volume knobs
+  rect(ctx, 232, 33, 3, 3, '#666');
+  rect(ctx, 237, 33, 3, 3, '#666');
+  // Guitar lobster
+  drawLobster(ctx, 183, 36, {body:'#cc6622',claw:'#ee8844',leg:'#aa4411',eye:'#ffffff',accent:'#ff9955'}, 0, 1);
+  // Musical notes floating
+  const noteOffsets = [[0,0],[10,-5],[20,-2],[5,-10]];
+  noteOffsets.forEach(([nx,ny],i)=>{
+    const noteY = ny - ((t*0.5+i*10)%20);
+    const noteA = Math.max(0, 1 - (Math.abs(noteY)+5)/25);
+    ctx.globalAlpha = noteA;
+    drawText(ctx, ['♪','♫','♩','♬'][i], 107+nx/SCALE, 18+noteY/SCALE, '#ffaa44', 8);
+    ctx.globalAlpha = 1;
+  });
+
+  // === Sleeping Room ===
+  // Bed
+  rect(ctx, 275, 38, 65, 16, '#334455');
+  rect(ctx, 275, 35, 65, 5, '#445566');
+  rect(ctx, 275, 35, 12, 14, '#556677');
+  // Pillow
+  rect(ctx, 278, 37, 8, 5, '#667788');
+  // Sleeping lobster
+  drawLobster(ctx, 293, 36, {body:'#336688',claw:'#4488aa',leg:'#224466',eye:'#223344',accent:'#5599bb'}, 0, 0);
+  // Blanket over lobster
+  ctx.globalAlpha = 0.7;
+  rect(ctx, 290, 42, 30, 8, '#445566');
+  ctx.globalAlpha = 1;
+  // ZZZ bubbles
+  const zPhase = Math.floor(t/15)%4;
+  const zTexts = ['Z','Z','ZZ','ZZZ'];
+  if(zPhase < 3){
+    for(let z=0;z<=zPhase;z++){
+      ctx.globalAlpha = 0.5 + z*0.2;
+      drawText(ctx, 'Z', 155+z*5, 20-z*3, '#88aaff', 8+z*2);
+      ctx.globalAlpha = 1;
+    }
+  }
+  // Nightstand
+  rect(ctx, 275, 46, 12, 10, '#334455');
+  // Lamp on nightstand
+  rect(ctx, 278, 38, 4, 8, '#888');
+  rect(ctx, 275, 36, 10, 3, '#ffff88');
+  ctx.globalAlpha = 0.15;
+  rect(ctx, 272, 39, 16, 12, '#ffff88');
+  ctx.globalAlpha = 1;
+}
+
+// --- 1F CANTEEN ---
+function drawCanteen(ctx, t){
+  rect(ctx, 0, 0, FLOOR_W, FLOOR_H, '#1a0800');
+  // Ceiling lights
+  for(let i=0;i<FLOOR_W;i+=60){
+    rect(ctx, i+15, 0, 30, 3, '#ffee88');
+    ctx.globalAlpha = 0.15;
+    rect(ctx, i+5, 0, 50, 30, '#ffee88');
+    ctx.globalAlpha = 1;
+  }
+  // Floor tiles
+  for(let x=0;x<FLOOR_W;x+=12){
+    rect(ctx, x, 56, 10, FLOOR_H-56, x%24===0 ? '#2a1800' : '#221200');
+  }
+
+  // Room dividers / sections
+  rect(ctx, 87, 30, 2, FLOOR_H-30, '#4a2800');
+  rect(ctx, 174, 30, 2, FLOOR_H-30, '#4a2800');
+  rect(ctx, 261, 30, 2, FLOOR_H-30, '#4a2800');
+
+  // === Chef Kitchen ===
+  // Kitchen counter
+  rect(ctx, 0, 38, 87, 6, '#885533');
+  rect(ctx, 0, 36, 87, 2, '#aa7744');
+  // Wok / pan
+  rect(ctx, 15, 28, 20, 8, '#888');
+  rect(ctx, 16, 29, 18, 6, '#999');
+  // Stir fry contents
+  rect(ctx, 17, 30, 16, 4, '#cc8822');
+  // Toss animation
+  const tossAnim = Math.floor(t/5)%3;
+  if(tossAnim===1){
+    rect(ctx, 20, 25, 10, 3, '#cc8822');
+    rect(ctx, 22, 22, 6, 3, '#ffaa44');
+  } else if(tossAnim===2){
+    rect(ctx, 18, 22, 14, 4, '#cc8822');
+  }
+  // Flame
+  const fh = 4 + Math.floor(Math.sin(t*0.2)*2);
+  rect(ctx, 20, 36-fh, 10, fh, '#ff6600');
+  rect(ctx, 22, 34-fh, 6, fh, '#ff9900');
+  rect(ctx, 24, 33-fh, 2, fh, '#ffff00');
+  // Steam
+  for(let s=0;s<3;s++){
+    const sy = 24 - ((t*0.4+s*8)%18);
+    ctx.globalAlpha = Math.max(0, 1-(sy/24));
+    rect(ctx, 18+s*5, sy, 2, 3, '#cccccc');
+    ctx.globalAlpha = 1;
+  }
+  // Chef lobster
+  drawLobster(ctx, 44, 26, {body:'#cc5500',claw:'#ff7700',leg:'#aa3300',eye:'#ffffff',accent:'#ff9944'}, 0, 1);
+  // Chef hat
+  rect(ctx, 45, 20, 7, 2, '#ffffff');
+  rect(ctx, 46, 14, 5, 8, '#ffffff');
+  rect(ctx, 47, 13, 3, 2, '#ffffff');
+  // Spoon in claw
+  rect(ctx, 52, 26, 1, 8, '#cccc88');
+  rect(ctx, 51, 25, 3, 3, '#cccc88');
+  // Pots and pans on hooks
+  [[5,15,'#666'],[12,12,'#888'],[20,15,'#777']].forEach(([px2,py2,pc])=>{
+    rect(ctx, px2, py2, 6, 5, pc);
+    rect(ctx, px2+1, py2-2, 1, 3, '#999');
+  });
+
+  // === Waiting Customers ===
+  // Tables and chairs
+  rect(ctx, 100, 42, 35, 4, '#aa7733');
+  rect(ctx, 105, 46, 4, 8, '#886622');
+  rect(ctx, 123, 46, 4, 8, '#886622');
+  // Seated customer lobster 1 (phone)
+  drawLobster(ctx, 103, 31, {body:'#886633',claw:'#aa8844',leg:'#664422',eye:'#0066ff',accent:'#ccaa55'}, 0, 0);
+  // Blue phone glow
+  ctx.globalAlpha = 0.4;
+  rect(ctx, 101, 30, 6, 5, '#0044ff');
+  ctx.globalAlpha = 1;
+  // Phone rect
+  rect(ctx, 102, 30, 5, 8, '#111');
+  rect(ctx, 103, 31, 3, 6, '#0033ff');
+
+  // Customer 2 (impatient)
+  const impAnim = Math.floor(t/10)%2;
+  drawLobster(ctx, 125, 31, {body:'#aa4422',claw:'#cc6644',leg:'#882211',eye:'#ffffff',accent:'#dd8866'}, impAnim, 0);
+  // Impatience indicator: sweat drop
+  if(impAnim===1){
+    rect(ctx, 132, 28, 2, 3, '#4488ff');
+  }
+  // Menu on table
+  rect(ctx, 112, 36, 12, 8, '#cc4444');
+  rect(ctx, 113, 37, 10, 6, '#dd5555');
+  for(let ml=0;ml<3;ml++) rect(ctx, 114, 38+ml*2, 8, 1, '#ffcccc');
+
+  // === Cashier Counter ===
+  // Counter
+  rect(ctx, 183, 30, 70, 28, '#aa6633');
+  rect(ctx, 183, 28, 70, 2, '#cc8855');
+  // Cash register
+  rect(ctx, 200, 20, 30, 16, '#333');
+  rect(ctx, 201, 21, 28, 6, '#444');
+  rect(ctx, 202, 22, 26, 4, '#555');
+  // Display
+  rect(ctx, 202, 22, 12, 4, '#001100');
+  // Price animation
+  const price = (Math.floor(t/30)%3+1) * 28 + 8;
+  drawText(ctx, '$'+price, 102, 14, '#00ff00', 7);
+  // Buttons
+  [[214,23,'#ff4444'],[218,23,'#44ff44'],[222,23,'#4444ff'],[226,23,'#ffff44']].forEach(([bx,by,bc])=>{
+    rect(ctx, bx, by, 3, 2, bc);
+  });
+  // Money tray
+  rect(ctx, 204, 36, 20, 4, '#887744');
+  rect(ctx, 206, 37, 6, 2, '#ffcc44');
+  rect(ctx, 215, 37, 6, 2, '#88ff44');
+  // Cashier lobster (boss lady)
+  drawLobster(ctx, 228, 20, {body:'#cc0066',claw:'#ee2288',leg:'#aa0044',eye:'#ffff00',accent:'#ff44aa'}, 0, 0);
+  // Abacus / calculator
+  rect(ctx, 238, 28, 10, 8, '#885533');
+  for(let ab=0;ab<4;ab++) rect(ctx, 240, 29+ab*2, 6, 1, '#ddaa55');
+
+  // === Delivery Person ===
+  // Scooter/bike base
+  rect(ctx, 270, 44, 50, 8, '#555');
+  rect(ctx, 272, 42, 46, 6, '#666');
+  // Wheels
+  ctx.strokeStyle = '#888'; ctx.lineWidth = SCALE;
+  ctx.beginPath(); ctx.arc(282*SCALE, 54*SCALE, 6*SCALE, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(308*SCALE, 54*SCALE, 6*SCALE, 0, Math.PI*2); ctx.stroke();
+  rect(ctx, 282, 54, 2, 2, '#444'); rect(ctx, 308, 54, 2, 2, '#444');
+  // Delivery box on back
+  rect(ctx, 305, 34, 20, 16, '#ff6600');
+  rect(ctx, 306, 35, 18, 14, '#ff8822');
+  drawText(ctx, 'EAT', 153, 24, '#ffffff', 7);
+  rect(ctx, 307, 30, 16, 2, '#ffaa44');
+  // Delivery lobster with helmet
+  drawLobster(ctx, 279, 30, {body:'#ff5500',claw:'#ff7700',leg:'#cc3300',eye:'#ffffff',accent:'#ff8844'}, 0, 1);
+  // Helmet
+  rect(ctx, 280, 25, 7, 5, '#ff6600');
+  rect(ctx, 281, 24, 5, 2, '#ff8833');
+  rect(ctx, 279, 28, 9, 2, '#cc4400');
+  // Motion lines (speedy)
+  const speedAnim = Math.floor(t/3)%3;
+  for(let sl=0;sl<4;sl++){
+    ctx.globalAlpha = [0.8,0.5,0.3][speedAnim%3] || 0.3;
+    rect(ctx, 262-sl*8, 38+sl*3, 8-sl, 1, '#ff8800');
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ============================================================
+// BUILD THE BUILDING
+// ============================================================
+const building = document.getElementById('building');
+const labelContainer = document.getElementById('floorLabels');
+const tooltip = document.getElementById('tooltip');
+const tipTitle = document.getElementById('tipTitle');
+const tipContent = document.getElementById('tipContent');
+
+const canvases = [];
+const animTimers = [];
+
+floors.forEach((floor, idx) => {
+  // Label
+  const lbl = document.createElement('div');
+  lbl.className = 'floor-label';
+  lbl.textContent = floor.label;
+  lbl.style.color = floor.accent;
+  labelContainer.appendChild(lbl);
+
+  // Floor div
+  const floorDiv = document.createElement('div');
+  floorDiv.className = 'floor';
+  floorDiv.style.background = floor.bg;
+  floorDiv.id = floor.id;
+
+  // Canvas
+  const canvas = document.createElement('canvas');
+  canvas.className = 'floor-canvas';
+  canvas.width = FLOOR_W * SCALE;
+  canvas.height = FLOOR_H * SCALE;
+  canvas.style.width = '700px';
+  canvas.style.height = '130px';
+  floorDiv.appendChild(canvas);
+
+  // Floor label overlay
+  const floorNameEl = document.createElement('div');
+  floorNameEl.style.cssText = `
+    position:absolute; left:6px; top:4px;
+    font-family:'Press Start 2P',monospace;
+    font-size:7px; color:${floor.accent};
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.8);
+    pointer-events:none; z-index:5;
+    opacity:0.8;
+  `;
+  floorNameEl.textContent = floor.name;
+  floorDiv.appendChild(floorNameEl);
+
+  // Tooltip events
+  floorDiv.addEventListener('mouseenter', (e) => {
+    tipTitle.textContent = floor.tip;
+    tipContent.textContent = floor.tipContent;
+    tooltip.classList.add('visible');
+    moveTip(e);
+  });
+  floorDiv.addEventListener('mousemove', moveTip);
+  floorDiv.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+
+  building.appendChild(floorDiv);
+  canvases.push({ canvas, floor });
+});
+
+function moveTip(e){
+  const x = e.clientX + 15;
+  const y = e.clientY + 15;
+  const tw = tooltip.offsetWidth;
+  const th = tooltip.offsetHeight;
+  tooltip.style.left = Math.min(x, window.innerWidth - tw - 10) + 'px';
+  tooltip.style.top = Math.min(y, window.innerHeight - th - 10) + 'px';
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+let t = 0;
+function animate(){
+  t++;
+  canvases.forEach(({canvas, floor}) => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    floor.draw(ctx, t);
+  });
+  requestAnimationFrame(animate);
+}
+animate();
+
+// ============================================================
+// CA COPY
+// ============================================================
+const CA_ADDRESS = 'TBA — 合约地址待公布';
+
+function copyCA(){
+  const btn = document.getElementById('caCopy');
+  const addr = document.getElementById('caAddress').textContent;
+  if(addr.startsWith('TBA')) return;
+  navigator.clipboard.writeText(addr).then(()=>{
+    btn.textContent = 'COPIED ✓';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = 'COPY ▶'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
